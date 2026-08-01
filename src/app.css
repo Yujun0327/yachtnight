@@ -1,0 +1,251 @@
+/* ------------------------------------------------------------------ */
+/* Yacht Night — "casino night" design tokens                          */
+/* One warm spotlight over deep green felt and blackened walnut.       */
+/* Ivory dice and a cream scoresheet are the only bright surfaces;     */
+/* brass is the one accent metal. Everything else falls into shadow.   */
+/* ------------------------------------------------------------------ */
+
+:root {
+  /* surfaces */
+  --night: #0a0d0b; /* the dark beyond the table — page ground */
+  --felt: #0b3d2e; /* spotlit felt center */
+  --felt-lo: #062017; /* felt falling into shadow */
+  --felt-hi: #145741;
+  --walnut: #241610; /* table rim, dark wood */
+  --walnut-hi: #3d2619;
+  --cream: #f4ecd9; /* scoresheet, dialogs — never pure white */
+  --cream-lo: #e2d5b8;
+  --ink: #22201a;
+  --ink-soft: #4c463a;
+
+  /* the accent metal */
+  --brass: #c9a227;
+  --brass-hi: #eed688;
+  --brass-lo: #8a6c14;
+
+  /* spotlight + drama */
+  --lamp: #ffd9a0; /* warm spotlight color */
+  --danger: #a8352f; /* scratch marks, zeroed boxes */
+  --pip: #2a2118; /* die pips: warm near-black ink */
+
+  /* type */
+  --font-display: 'Limelight', 'Futura', sans-serif;
+  --font-numeral: 'Bodoni Moda', 'Didot', serif;
+  --font-ui: 'Jost', 'Avenir Next', 'Futura', sans-serif;
+
+  /* modular scale, ratio 1.25, base 16 */
+  --fs-xs: 0.8rem;
+  --fs-sm: 1rem;
+  --fs-md: 1.25rem;
+  --fs-lg: 1.563rem;
+  --fs-xl: 1.953rem;
+  --fs-2xl: 2.441rem;
+  --fs-3xl: 3.052rem;
+
+  /* spacing */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* shape */
+  --r-chip: 2px;
+  --r-card: 6px;
+
+  /* elevation: ONE low shadow; frames get an inset brass hairline */
+  --shadow: 0 2px 8px rgb(0 0 0 / 0.55);
+  --hairline: inset 0 0 0 1.5px var(--brass);
+  --hairline-dim: inset 0 0 0 1px color-mix(in srgb, var(--brass) 45%, transparent);
+
+  /* foil: the only gradient allowed on chrome */
+  --foil: linear-gradient(105deg, var(--brass-lo) 0%, var(--brass-hi) 45%, var(--brass) 60%, var(--brass-lo) 100%);
+
+  /* the spotlight: page-scale radial wash, warm center to darkness */
+  --spotlight: radial-gradient(
+    ellipse 90% 70% at 50% 38%,
+    color-mix(in srgb, var(--lamp) 14%, transparent) 0%,
+    transparent 62%
+  );
+
+  /* paper grain: feTurbulence baked to a tiling data-URI, overlaid at low opacity */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.47 0 0 0 0 0.42 0 0 0 0.5 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--night);
+  color: var(--cream);
+  font-family: var(--font-ui);
+  font-size: var(--fs-sm);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#app {
+  min-height: 100dvh;
+  position: relative;
+}
+
+/* page-wide grain + spotlight wash over the darkness */
+#app::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: var(--spotlight), var(--grain);
+  background-size: auto, 160px 160px;
+  opacity: 1;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#app > * {
+  position: relative;
+  z-index: 1;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  margin: 0;
+  color: var(--cream);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* numerals in counts must always align */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* letter-spaced small-caps label — the house label style */
+.label {
+  font-family: var(--font-ui);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: color-mix(in srgb, var(--cream) 72%, transparent);
+}
+
+/* brass foil text (display numerals, titles) */
+.foil-text {
+  background: var(--foil);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ------------------------------------------------------------------ */
+/* buttons                                                             */
+/* ------------------------------------------------------------------ */
+
+.btn {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cream);
+  background: var(--felt);
+  border: none;
+  border-radius: var(--r-chip);
+  box-shadow: var(--hairline-dim), var(--shadow);
+  padding: 12px 24px;
+  min-height: 44px;
+  transition: box-shadow 120ms ease, transform 120ms ease, background 120ms ease;
+}
+
+.btn:hover {
+  background: var(--felt-hi);
+  box-shadow: var(--hairline), var(--shadow);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+  transform: none;
+}
+
+.btn--gold {
+  color: var(--night);
+  background: var(--brass);
+  box-shadow: inset 0 0 0 1.5px var(--brass-lo), var(--shadow);
+}
+
+.btn--gold:hover {
+  background: var(--brass-hi);
+  box-shadow: inset 0 0 0 1.5px var(--brass-lo), var(--shadow);
+}
+
+.btn--quiet {
+  background: transparent;
+  box-shadow: var(--hairline-dim);
+}
+
+.btn--quiet:hover {
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: var(--hairline);
+}
+
+/* custom brass focus ring — never the default blue, never removed */
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* cream panel (dialogs, the scoresheet)                               */
+/* ------------------------------------------------------------------ */
+
+.panel {
+  background: var(--cream);
+  color: var(--ink);
+  border-radius: var(--r-card);
+  box-shadow: var(--hairline-dim), var(--shadow);
+  position: relative;
+}
+
+.panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-image: var(--grain);
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
