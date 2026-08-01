@@ -11,6 +11,7 @@ async function phonePlugins(): Promise<PluginOption[]> {
 }
 
 export default defineConfig(async () => ({
+  base: process.env.DEPLOY_BASE ?? '/',
   plugins: [svelte(), ...(await phonePlugins())],
   define: {
     __BUILD_STAMP__: JSON.stringify(new Date().toISOString().slice(0, 16).replace('T', ' ') + ' UTC'),
