@@ -110,19 +110,21 @@ export interface CupBody {
 export function makeCup(world: CANNON.World, material: CANNON.Material): CupBody {
   const bodies: CANNON.Body[] = []
   const panelW = (2 * Math.PI * CUP.radius) / CUP.panels
-  // side panels + floor disk + ceiling (a closed shaker while rattling)
+  // side panels + floor disk + ceiling (a closed shaker while rattling).
+  // Panels are FAT (0.5 half-thickness) — kinematic bodies teleport each
+  // frame, so thin walls let fast dice tunnel straight through.
   for (let i = 0; i < CUP.panels; i++) {
     const b = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material })
-    b.addShape(new CANNON.Box(new CANNON.Vec3(panelW / 2 + 0.1, CUP.height / 2, 0.15)))
+    b.addShape(new CANNON.Box(new CANNON.Vec3(panelW / 2 + 0.25, CUP.height / 2 + 0.3, 0.5)))
     world.addBody(b)
     bodies.push(b)
   }
   const floor = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material })
-  floor.addShape(new CANNON.Box(new CANNON.Vec3(CUP.radius + 0.2, 0.15, CUP.radius + 0.2)))
+  floor.addShape(new CANNON.Box(new CANNON.Vec3(CUP.radius + 0.5, 0.35, CUP.radius + 0.5)))
   world.addBody(floor)
   bodies.push(floor)
   const lid = new CANNON.Body({ mass: 0, type: CANNON.Body.KINEMATIC, material })
-  lid.addShape(new CANNON.Box(new CANNON.Vec3(CUP.radius + 0.2, 0.15, CUP.radius + 0.2)))
+  lid.addShape(new CANNON.Box(new CANNON.Vec3(CUP.radius + 0.5, 0.35, CUP.radius + 0.5)))
   world.addBody(lid)
   bodies.push(lid)
 
@@ -133,18 +135,19 @@ export function makeCup(world: CANNON.World, material: CANNON.Material): CupBody
     tilt.setFromEuler(tiltX, 0, tiltZ)
     for (let i = 0; i < CUP.panels; i++) {
       const a = ((i + 0.5) / CUP.panels) * Math.PI * 2
-      const px = Math.cos(a) * CUP.radius
-      const pz = Math.sin(a) * CUP.radius
+      // panel centers sit half a thickness OUTSIDE the interior radius
+      const px = Math.cos(a) * (CUP.radius + 0.5)
+      const pz = Math.sin(a) * (CUP.radius + 0.5)
       q.setFromEuler(0, -a + Math.PI / 2, 0)
       const local = new CANNON.Vec3(px, 0, pz)
       const rotated = tilt.vmult(local)
       bodies[i].position.set(x + rotated.x, y + rotated.y, z + rotated.z)
       bodies[i].quaternion = tilt.mult(q)
     }
-    const fl = tilt.vmult(new CANNON.Vec3(0, -CUP.height / 2, 0))
+    const fl = tilt.vmult(new CANNON.Vec3(0, -CUP.height / 2 - 0.35, 0))
     bodies[CUP.panels].position.set(x + fl.x, y + fl.y, z + fl.z)
     bodies[CUP.panels].quaternion.copy(tilt)
-    const ld = tilt.vmult(new CANNON.Vec3(0, CUP.height / 2, 0))
+    const ld = tilt.vmult(new CANNON.Vec3(0, CUP.height / 2 + 0.35, 0))
     bodies[CUP.panels + 1].position.set(x + ld.x, y + ld.y, z + ld.z)
     bodies[CUP.panels + 1].quaternion.copy(tilt)
   }

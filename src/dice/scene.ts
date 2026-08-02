@@ -43,6 +43,7 @@ export interface Stage {
 
 const CAM_POS = new Vector3(0, 13.5, 11.5)
 const CAM_LOOK = new Vector3(0, 0, -0.6)
+const CAM_DIR = CAM_POS.clone().sub(CAM_LOOK).normalize()
 
 export function createStage(canvas: HTMLCanvasElement): Stage {
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true })
@@ -144,9 +145,10 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
 
   const camShake = new Vector3()
   const camPush = { value: 0 }
+  const basePos = CAM_POS.clone()
 
   function render(): void {
-    camera.position.copy(CAM_POS).addScaledVector(CAM_LOOK.clone().sub(CAM_POS).normalize(), camPush.value * 3.2)
+    camera.position.copy(basePos).addScaledVector(CAM_DIR, -camPush.value * 3.2)
     camera.position.add(camShake)
     camera.lookAt(CAM_LOOK)
     renderer.render(scene, camera)
@@ -156,6 +158,14 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
     renderer.setSize(w, h, false)
     camera.aspect = w / h
     camera.updateProjectionMatrix()
+    // frame the WHOLE pad (rim included) at any aspect: pull the camera back
+    // along its fixed direction until both extents fit with margin
+    const vfov = (camera.fov * Math.PI) / 180
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect)
+    const needW = PAD.halfW + 2.4
+    const needD = PAD.halfD + 4.6
+    const dist = Math.max(needW / Math.tan(hfov / 2), needD / Math.tan(vfov / 2), 13)
+    basePos.copy(CAM_LOOK).addScaledVector(CAM_DIR, dist)
   }
 
   function dispose(): void {

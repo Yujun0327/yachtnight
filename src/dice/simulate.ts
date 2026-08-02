@@ -51,19 +51,20 @@ const SETTLE_ANG = 0.6
 export function seededLaunches(seed: number, count: number, vigor = 0.7): DieLaunch[] {
   const rng = mulberry32(seed)
   const out: DieLaunch[] = []
-  const side = rng() < 0.5 ? -1 : 1
+  // pour from the cup's spot: front-center of the pad, throwing inward,
+  // matching the tipping-cup choreography every observer sees
+  const lean = (rng() - 0.5) * 3
   for (let i = 0; i < count; i++) {
-    const spread = (i - (count - 1) / 2) * 1.15
     out.push({
       position: [
-        side * (PAD.halfW - 1.2) + rng() * 0.6,
-        3.2 + rng() * 1.4 + i * 0.35,
-        spread + (rng() - 0.5) * 0.8,
+        lean + (rng() - 0.5) * 1.4,
+        4.2 + rng() * 1.0 + i * 0.2,
+        PAD.halfD - 1.6 - i * 0.5,
       ],
       velocity: [
-        -side * (9 + 9 * vigor + rng() * 4),
-        1.5 + rng() * 2,
         (rng() - 0.5) * 5,
+        -1 - rng() * 2,
+        -(8 + 8 * vigor + rng() * 4) - i * 0.7,
       ],
       angular: [
         (rng() - 0.5) * 24 * (0.4 + vigor),

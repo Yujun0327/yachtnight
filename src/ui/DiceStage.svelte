@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import { Raycaster, Vector2 } from 'three'
   import { topFaceOf } from '../dice/facemap'
   import { RollDirector } from '../dice/roll-director'
@@ -143,6 +144,11 @@
     prevHeld = cur
   })
 
+  // Mount-once: this effect must have NO reactive dependencies, or a mid-roll
+  // prop change would tear down the stage and director in mid-flight (that
+  // exact bug froze the game after the first real-time roll). Prop reads are
+  // untracked; the scrub adapter lives in its own effect because `cupEl`
+  // comes and goes with `canRoll`.
   $effect(() => {
     stage = createStage(canvasEl)
     director = new RollDirector(stage, {
@@ -160,7 +166,7 @@
       },
       onRevealed: (f) => onRevealed?.(f),
     })
-    director.showFaces(faces, held)
+    untrack(() => director!.showFaces([...faces], [...held]))
 
     const ro = new ResizeObserver(() => {
       const r = hostEl.getBoundingClientRect()
@@ -168,7 +174,6 @@
     })
     ro.observe(hostEl)
 
-    const detachScrub = cupEl ? attachScrub(cupEl, sink) : () => {}
     const detachKeys = attachKeys(sink)
 
     let last = performance.now()
@@ -189,7 +194,6 @@
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
-      detachScrub()
       detachKeys()
       stopShake()
       director?.dispose()
@@ -197,6 +201,13 @@
       stage = null
       director = null
     }
+  })
+
+  // the cup grip element only exists while the player may roll
+  $effect(() => {
+    const el = cupEl
+    if (!el) return
+    return attachScrub(el, sink)
   })
 
   const shaking = $derived(phase === 'shaking')

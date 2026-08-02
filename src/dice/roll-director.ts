@@ -103,12 +103,19 @@ export class RollDirector {
     this.stage.cup.visible = false
     this.lastShownFaces = [...faces]
     this.heldMask = [...held]
-    const rolled = faces.map((f, i) => ({ f: f || 1, i })).filter(({ i }) => !held[i])
-    const seed = faces.reduce((a, f, i) => a * 7 + f + i, 3) >>> 0
-    const launches = seededLaunches(seed, rolled.length, 0.5)
-    const rec = simulateRoll(launches, seed)
-    const pb = new Playback(rec, rolled.map(({ f }) => f))
-    pb.finish(rolled.map(({ i }) => this.stage.dice[i]))
+    // face 0 = not yet rolled this turn: those dice wait in the player's
+    // hand, not on the felt
+    const rolled = faces.map((f, i) => ({ f, i })).filter(({ f, i }) => !held[i] && f > 0)
+    faces.forEach((f, i) => {
+      this.stage.dice[i].visible = held[i] || f > 0
+    })
+    if (rolled.length > 0) {
+      const seed = faces.reduce((a, f, i) => a * 7 + f + i, 3) >>> 0
+      const launches = seededLaunches(seed, rolled.length, 0.5)
+      const rec = simulateRoll(launches, seed)
+      const pb = new Playback(rec, rolled.map(({ f }) => f))
+      pb.finish(rolled.map(({ i }) => this.stage.dice[i]))
+    }
     faces.forEach((f, i) => {
       if (held[i]) this.placeInSlot(i, f || 1, false)
     })
@@ -203,9 +210,11 @@ export class RollDirector {
     this.playback = new Playback(rec, targetFaces, {
       onImpact: (s) => this.hooks.onImpact?.(s),
     })
-    this.playT = 0
+    // the cup tips first; the dice stay hidden inside it until the mouth
+    // has cleared, then the recording takes over from the mouth position
+    this.playT = -0.22
     this.clearLive()
-    for (const i of this.thrownIdx) this.stage.dice[i].visible = true
+    for (const i of this.thrownIdx) this.stage.dice[i].visible = false
     this.cupToss = 0
     this.hooks.onThrown?.()
     this.setPhase('rolling')
@@ -219,6 +228,8 @@ export class RollDirector {
   }
 
   private finishRoll(): void {
+    // the pour keeps dice hidden until t=0; a skip may land here first
+    for (const i of this.thrownIdx) this.stage.dice[i].visible = true
     this.playback = null
     this.stage.cup.visible = false
     this.stage.camPush.value = 0
@@ -237,10 +248,11 @@ export class RollDirector {
     this.liveCup = makeCup(world, table)
     this.liveDice = this.thrownIdx.map((_, k) => {
       const body = makeDie(dieMat)
+      // stack well inside the cup interior, clear of every panel
       body.position.set(
-        (k % 2) * 0.9 - 0.45,
-        CUP_Y - CUP.height / 2 + 1 + Math.floor(k / 2) * 1.1,
-        CUP_Z,
+        (k % 2) * 0.8 - 0.4,
+        CUP_Y - CUP.height / 2 + 0.9 + Math.floor(k / 2) * 1.05,
+        CUP_Z + (k % 3) * 0.3 - 0.3,
       )
       body.allowSleep = false
       world.addBody(body)
@@ -261,26 +273,35 @@ export class RollDirector {
     this.liveCup = null
   }
 
+  /**
+   * Launch states for the pour: the dice leave from the CUP'S MOUTH as it
+   * tips forward, one after another, so the playback reads as the cup
+   * emptying — not as dice materializing mid-air.
+   */
   private launchesFromLive(dir: [number, number], speed: number): DieLaunch[] {
     const [dx, dz] = normalize2(dir)
-    const power = 10 + 16 * Math.min(1, speed)
+    const power = 9 + 14 * Math.min(1, speed)
     const rng = mulberry32((Math.floor(speed * 1e4) + 17) >>> 0)
-    return this.liveDice.map((body) => {
-      const p = body.position
-      // clamp the start inside the pad airspace
-      const px = Math.max(-PAD.halfW + 1, Math.min(PAD.halfW - 1, p.x))
-      const pz = Math.max(-PAD.halfD + 1, Math.min(PAD.halfD - 1, p.z))
+    // mouth of the tipping cup: just forward of and slightly below the rim
+    const mx = Math.max(-PAD.halfW + 2, Math.min(PAD.halfW - 2, this.cupPose.x))
+    const my = CUP_Y - 0.2
+    const mz = CUP_Z - CUP.height / 2 - 0.4
+    return this.liveDice.map((body, k) => {
       return {
-        position: [px, Math.max(2.4, p.y), pz],
+        position: [
+          mx + (rng() - 0.5) * 1.2,
+          my + (rng() - 0.5) * 0.8,
+          mz - k * 0.55, // successive dice slightly further out of the mouth
+        ],
         velocity: [
-          dx * power + body.velocity.x * 0.35,
-          1.2 + rng() * 1.6,
-          dz * power + body.velocity.z * 0.35,
+          dx * power + body.velocity.x * 0.25 + (rng() - 0.5) * 2,
+          -1 - rng() * 2, // pouring downward-forward, never popping up
+          dz * power + body.velocity.z * 0.25 - k * 0.8,
         ],
         angular: [
-          body.angularVelocity.x + (rng() - 0.5) * 18 * (0.5 + speed),
-          body.angularVelocity.y + (rng() - 0.5) * 18 * (0.5 + speed),
-          body.angularVelocity.z + (rng() - 0.5) * 18 * (0.5 + speed),
+          body.angularVelocity.x + (rng() - 0.5) * 16 * (0.5 + speed),
+          body.angularVelocity.y + (rng() - 0.5) * 16 * (0.5 + speed),
+          body.angularVelocity.z + (rng() - 0.5) * 16 * (0.5 + speed),
         ],
         quaternion: [body.quaternion.x, body.quaternion.y, body.quaternion.z, body.quaternion.w],
       } satisfies DieLaunch
@@ -309,11 +330,15 @@ export class RollDirector {
       this.stepLive(dt)
     } else if (this.phase === 'rolling' && this.playback) {
       this.playT += dt
+      const t = Math.max(0, this.playT)
       const meshes = this.thrownIdx.map((i) => this.stage.dice[i])
-      const playing = this.playback.seek(this.playT, meshes)
+      if (this.playT >= 0 && meshes.some((m) => !m.visible)) {
+        for (const m of meshes) m.visible = true
+      }
+      const playing = this.playback.seek(t, meshes) || this.playT < 0
       // camera pushes in as the last die settles
       const lead = this.playback.duration - 0.6
-      this.stage.camPush.value = Math.max(0, Math.min(1, (this.playT - lead) / 0.6)) * 0.5
+      this.stage.camPush.value = Math.max(0, Math.min(1, (t - lead) / 0.6)) * 0.5
       this.stepCupToss(dt)
       if (!playing) this.finishRoll()
     } else {
@@ -329,16 +354,29 @@ export class RollDirector {
     // cup follows the pointer with jitter scaled by intensity
     const targetX = (this.pointerX - 0.5) * 2 * CUP_X_RANGE
     this.cupPose.x += (targetX - this.cupPose.x) * Math.min(1, dt * 14)
-    const jx = Math.sin(this.time * 31) * 0.55 * i + Math.sin(this.time * 17.3) * 0.3 * i
-    const jy = Math.sin(this.time * 27.1 + 1.3) * 0.5 * i
-    const jz = Math.sin(this.time * 23.7 + 2.1) * 0.35 * i
-    const tiltX = Math.sin(this.time * 19.3) * 0.28 * i
-    const tiltZ = Math.sin(this.time * 24.7 + 0.7) * 0.28 * i
+    const jx = Math.sin(this.time * 26) * 0.32 * i + Math.sin(this.time * 15.3) * 0.18 * i
+    const jy = Math.sin(this.time * 22.1 + 1.3) * 0.3 * i
+    const jz = Math.sin(this.time * 19.7 + 2.1) * 0.2 * i
+    const tiltX = Math.sin(this.time * 16.3) * 0.16 * i
+    const tiltZ = Math.sin(this.time * 20.7 + 0.7) * 0.16 * i
     const cx = this.cupPose.x + jx
     const cy = CUP_Y + jy
     const cz = CUP_Z + jz
     this.liveCup.setPose(cx, cy, cz, tiltX, tiltZ)
-    this.liveWorld.step(1 / 60, dt, 3)
+    // fine fixed steps: kinematic panels teleport, so coarse steps tunnel
+    this.liveWorld.step(1 / 120, dt, 8)
+
+    // belt and braces: any die that still slipped a panel gets recaptured
+    for (const body of this.liveDice) {
+      const dx = body.position.x - cx
+      const dy = body.position.y - cy
+      const dz = body.position.z - cz
+      if (Math.hypot(dx, dz) > CUP.radius * 1.5 || Math.abs(dy) > CUP.height * 0.9) {
+        body.position.set(cx, cy, cz)
+        body.velocity.set(0, -2, 0)
+        body.angularVelocity.scale(0.3, body.angularVelocity)
+      }
+    }
 
     // sync meshes
     this.stage.cup.position.set(cx, cy, cz)
@@ -367,16 +405,23 @@ export class RollDirector {
   private stepCupToss(dt: number): void {
     if (this.cupToss < 0) return
     this.cupToss += dt
-    const k = Math.min(1, this.cupToss / 0.35)
     const cup = this.stage.cup
-    // tip forward over the pad, then whisk away
-    cup.rotation.x = -2.1 * k
-    cup.position.y = CUP_Y + 1.2 * k
-    cup.position.z = CUP_Z - 2.2 * k
-    if (k >= 1) {
-      cup.visible = false
-      cup.rotation.set(0, 0, 0)
-      this.cupToss = -1
+    // phase 1 (0–0.25s): tip forward so the mouth faces the pad — the pour.
+    // phase 2 (0.25–0.7s): lift away and fade out of frame.
+    const tip = Math.min(1, this.cupToss / 0.25)
+    const e = tip * tip * (3 - 2 * tip)
+    cup.rotation.x = -1.9 * e
+    cup.position.z = CUP_Z - 1.1 * e
+    cup.position.y = CUP_Y + 0.2 * e
+    if (this.cupToss > 0.25) {
+      const away = Math.min(1, (this.cupToss - 0.25) / 0.45)
+      cup.position.y = CUP_Y + 0.2 + 2.6 * away * away
+      cup.position.z = CUP_Z - 1.1 + 1.4 * away
+      if (away >= 1) {
+        cup.visible = false
+        cup.rotation.set(0, 0, 0)
+        this.cupToss = -1
+      }
     }
   }
 
