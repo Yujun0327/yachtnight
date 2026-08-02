@@ -232,7 +232,6 @@ export class RollDirector {
     for (const i of this.thrownIdx) this.stage.dice[i].visible = true
     this.playback = null
     this.stage.cup.visible = false
-    this.stage.camPush.value = 0
     this.setPhase('done')
     this.hooks.onRevealed?.([...this.lastShownFaces])
     this.setPhase('idle')
@@ -336,9 +335,6 @@ export class RollDirector {
         for (const m of meshes) m.visible = true
       }
       const playing = this.playback.seek(t, meshes) || this.playT < 0
-      // camera pushes in as the last die settles
-      const lead = this.playback.duration - 0.6
-      this.stage.camPush.value = Math.max(0, Math.min(1, (t - lead) / 0.6)) * 0.5
       this.stepCupToss(dt)
       if (!playing) this.finishRoll()
     } else {

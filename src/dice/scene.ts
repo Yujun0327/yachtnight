@@ -55,20 +55,21 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   camera.position.copy(CAM_POS)
   camera.lookAt(CAM_LOOK)
 
-  /* lights: one warm spot + faint ambient + a candle-warm fill */
-  const spot = new SpotLight('#ffd9a0', 900)
+  /* lights: one warm spot + generous ambient + a candle-warm fill.
+     Bright and inviting — the drama comes from warmth, not gloom. */
+  const spot = new SpotLight('#ffe4b8', 1600)
   spot.position.set(0, 16, 2)
-  spot.angle = 0.62
-  spot.penumbra = 0.55
-  spot.decay = 1.6
+  spot.angle = 0.74
+  spot.penumbra = 0.6
+  spot.decay = 1.5
   spot.castShadow = true
   spot.shadow.mapSize.set(512, 512)
   spot.shadow.bias = -0.002
   spot.target.position.set(0, 0, 0)
   scene.add(spot, spot.target)
-  scene.add(new AmbientLight('#2c3a33', 2.2))
-  const fill = new PointLight('#ff9f4a', 60, 30, 1.8)
-  fill.position.set(-6, 6, 8)
+  scene.add(new AmbientLight('#5a6b60', 3.6))
+  const fill = new PointLight('#ffb066', 160, 40, 1.7)
+  fill.position.set(-6, 7, 8)
   scene.add(fill)
 
   /* the table */
