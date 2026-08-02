@@ -111,6 +111,43 @@ export function throwWhoosh(): void {
   }
 }
 
+/**
+ * Banked-combo celebrations, escalating with the tier. Tier 3 layers a
+ * rising sweep, a doubled five-note fanfare, cymbal bursts, a floor boom
+ * and a closing bell — the audio equivalent of the confetti storm.
+ */
+export function celebrate(tier: 1 | 2 | 3): void {
+  if (muted) return
+  try {
+    if (tier === 1) {
+      noise({ vol: 0.22, cutoff: 6000, dur: 0.05, type: 'highpass' })
+      tone(659, { dur: 0.22, vol: 0.15 })
+      tone(880, { t: 0.1, dur: 0.32, vol: 0.15 })
+    } else if (tier === 2) {
+      for (const [i, f] of [523, 659, 784, 1047].entries()) {
+        tone(f, { t: i * 0.09, dur: 0.24, vol: 0.16 })
+      }
+      noise({ t: 0.3, vol: 0.2, cutoff: 7000, dur: 0.28, type: 'highpass' })
+      tone(1319, { t: 0.42, dur: 0.4, vol: 0.12, type: 'sine' })
+    } else {
+      tone(220, { dur: 0.5, vol: 0.18, type: 'sawtooth', glide: 660 })
+      tone(65, { t: 0.32, dur: 0.7, vol: 0.26, type: 'sine' })
+      for (const [i, f] of [523, 659, 784, 1047, 1319].entries()) {
+        tone(f, { t: 0.35 + i * 0.11, dur: 0.38, vol: 0.18 })
+        tone(f / 2, { t: 0.35 + i * 0.11, dur: 0.38, vol: 0.11, type: 'triangle' })
+      }
+      for (const i of [0, 1, 2]) {
+        noise({ t: 0.45 + i * 0.28, vol: 0.22, cutoff: 6500, dur: 0.3, type: 'highpass' })
+      }
+      tone(2093, { t: 1.15, dur: 0.9, vol: 0.12, type: 'sine' })
+      tone(1568, { t: 1.3, dur: 0.8, vol: 0.1, type: 'sine' })
+      noise({ t: 1.25, vol: 0.16, cutoff: 900, dur: 0.45, type: 'bandpass' })
+    }
+  } catch {
+    /* silent */
+  }
+}
+
 /* ---------------- session events ---------------- */
 
 export function play(sfx: SfxEvent | 'select' | 'error'): void {

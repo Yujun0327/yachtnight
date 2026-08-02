@@ -1,14 +1,13 @@
 /**
- * Solo game probe: Home → 1-player Classic Yacht → roll & score all 12
- * boxes via real pointer gestures → victory overlay with a final score.
+ * Solo game probe: Home → 1-player Classic Yacht → roll, bank all five,
+ * score — all 12 boxes via real pointer gestures → victory overlay.
  * Run: node e2e/solo-probe.mjs (assumes dist/ is built)
  */
 import { spawn } from 'node:child_process'
 import { chromium } from 'playwright'
+import { bankAll } from './bank-helper.mjs'
 
 const PORT = 4198
-const url = `http://localhost:${PORT}/`
-
 console.log('[solo] starting preview…')
 const preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], {
   stdio: 'pipe',
@@ -23,13 +22,12 @@ try {
   page.on('pageerror', (e) => errors.push(String(e)))
   await page.emulateMedia({ reducedMotion: 'reduce' })
 
-  await page.goto(url)
+  await page.goto(`http://localhost:${PORT}/`)
   await page.click('button.seat:has-text("1")')
   await page.click('button:has-text("Begin")')
   await page.waitForSelector('.cup-grip', { timeout: 8_000 })
 
   for (let turn = 1; turn <= 12; turn++) {
-    // roll: grab the cup, wiggle, flick
     const cup = page.locator('.cup-grip')
     await cup.waitFor({ timeout: 8_000 })
     const box = await cup.boundingBox()
@@ -42,12 +40,24 @@ try {
     }
     await page.mouse.move(cx, cy - 160, { steps: 3 })
     await page.mouse.up()
+    await page.waitForSelector('.game[data-rolling="false"]', { timeout: 15_000 })
+    await page.waitForTimeout(300)
 
-    // score: first offered box
+    // the new ritual: no scoring until all five dice are banked in the tray
+    const picksBefore = await page.locator('.pick').count()
+    if (picksBefore > 0) {
+      console.error('[solo] FAIL: sheet unlocked before banking')
+      failed = true
+    }
+    if (!(await bankAll(page))) {
+      console.error(`[solo] FAIL: could not bank all five on turn ${turn}`)
+      failed = true
+      break
+    }
     const pick = page.locator('.pick').first()
     await pick.waitFor({ timeout: 15_000 })
     await pick.click()
-    console.log(`[solo] turn ${turn} scored`)
+    console.log(`[solo] turn ${turn} banked & scored`)
   }
 
   await page.waitForSelector('text=final score', { timeout: 10_000 })
@@ -58,7 +68,7 @@ try {
     const el = document.querySelector('.overlay')
     if (!el) return 'GONE'
     const cs = getComputedStyle(el)
-    return `present opacity=${cs.opacity} display=${cs.display} z=${cs.zIndex}`
+    return `present opacity=${cs.opacity} z=${cs.zIndex}`
   })
   console.log('[solo] overlay after 400ms:', overlayStillThere)
   if (overlayStillThere === 'GONE') failed = true

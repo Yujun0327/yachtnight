@@ -3,12 +3,15 @@
   import type { BaseSession, OnlineSession } from '../app/session.svelte'
   import type { CategoryId } from '../engine'
   import { MAX_ROLLS } from '../engine'
+  import Celebration from './Celebration.svelte'
   import type DiceStage from './DiceStage.svelte'
   import HandoffCurtain from './HandoffCurtain.svelte'
   import RulesLeaflet from './RulesLeaflet.svelte'
   import Scoresheet from './Scoresheet.svelte'
   import VictoryOverlay from './VictoryOverlay.svelte'
-  import { isMuted, play, setMuted } from './audio'
+  import { celebrate, isMuted, play, setMuted } from './audio'
+  import { comboOf } from './combo'
+  import type { Combo } from './combo'
 
   interface Props {
     session: BaseSession
@@ -79,11 +82,26 @@
   })
 
   const canAct = $derived(session.myTurn && !gs.result && !rolling && !curtain)
-  const canRoll = $derived(
-    canAct && gs.rollsUsed < MAX_ROLLS && !heldDraft.every(Boolean),
-  )
+  const allBanked = $derived(heldDraft.every(Boolean))
+  const canRoll = $derived(canAct && gs.rollsUsed < MAX_ROLLS && !allBanked)
   const canHold = $derived(canAct && gs.rollsUsed > 0)
-  const canScore = $derived(canAct && gs.rollsUsed > 0)
+  // the ritual's commit gesture: only a fully banked tray unlocks the sheet
+  const canScore = $derived(canAct && gs.rollsUsed > 0 && allBanked)
+
+  /* banked-combo celebrations — once per (turn, roll) */
+  let celebration = $state<Combo | null>(null)
+  let celebratedKey = ''
+  $effect(() => {
+    if (!allBanked || !canAct || gs.rollsUsed === 0) return
+    const key = `${gs.seatToAct}:${gs.rollsUsed}:${gs.dice.join('')}`
+    if (key === celebratedKey) return
+    celebratedKey = key
+    const combo = comboOf(gs.dice, gs.ruleset)
+    if (combo) {
+      celebration = combo
+      celebrate(combo.tier)
+    }
+  })
 
   function onRoll(held: boolean[]): number[] | null {
     try {
@@ -123,12 +141,13 @@
     const who = session.myTurn && online ? 'Your turn' : name
     if (rolling) return `${who} — the dice are out…`
     if (gs.rollsUsed === 0) return `${who} — shake the cup`
-    if (gs.rollsUsed >= MAX_ROLLS) return `${who} — choose a box`
-    return `${who} — roll ${gs.rollsUsed} of ${MAX_ROLLS}, keep or throw again`
+    if (allBanked) return `${who} — choose a box on the sheet`
+    if (gs.rollsUsed >= MAX_ROLLS) return `${who} — bank all five dice to score`
+    return `${who} — roll ${gs.rollsUsed} of ${MAX_ROLLS} · keep dice, or bank all five to score`
   })
 </script>
 
-<main class="game">
+<main class="game" data-banked={heldDraft.filter(Boolean).length} data-rolling={rolling}>
   <header class="topbar">
     <button class="btn btn--quiet small" onclick={onExit}>Leave</button>
     <p class="turn-line" aria-live="polite">{turnLine}</p>
@@ -196,6 +215,14 @@
 
   {#if flash}
     <div class="flash" aria-hidden="true"></div>
+  {/if}
+
+  {#if celebration}
+    <Celebration
+      tier={celebration.tier}
+      title={celebration.title}
+      onDone={() => (celebration = null)}
+    />
   {/if}
 </main>
 

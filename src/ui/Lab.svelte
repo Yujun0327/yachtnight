@@ -1,6 +1,10 @@
 <script lang="ts">
   import { rollDice } from '../engine'
+  import Celebration from './Celebration.svelte'
   import type DiceStage from './DiceStage.svelte'
+  import { celebrate } from './audio'
+  import { comboOf } from './combo'
+  import type { Combo } from './combo'
 
   const diceStageModule = import('./DiceStage.svelte')
 
@@ -22,6 +26,21 @@
   $effect(() => {
     ;(window as unknown as Record<string, unknown>).__lab = {
       visualFaces: () => stageRef?.visualFaces() ?? [],
+    }
+  })
+
+  /* banked-combo celebrations, same ladder as the real game (yacht rules) */
+  let celebration = $state<Combo | null>(null)
+  let celebratedKey = ''
+  $effect(() => {
+    if (!held.every(Boolean) || rolling) return
+    const key = `${rolls}:${faces.join('')}`
+    if (key === celebratedKey) return
+    celebratedKey = key
+    const combo = comboOf(faces, 'yacht')
+    if (combo) {
+      celebration = combo
+      celebrate(combo.tier)
     }
   })
 
@@ -119,6 +138,14 @@
     <button class="label back" onclick={() => (location.hash = '')}>← home</button>
     <p class="stamp label">{__BUILD_STAMP__}</p>
   </aside>
+
+  {#if celebration}
+    <Celebration
+      tier={celebration.tier}
+      title={celebration.title}
+      onDone={() => (celebration = null)}
+    />
+  {/if}
 </main>
 
 <style>

@@ -1,14 +1,16 @@
+/** Real-time (NO reduced motion) roll → bank → score-picks regression probe. */
 import { spawn } from 'node:child_process'
 import { chromium } from 'playwright'
+import { bankAll } from './bank-helper.mjs'
 const PORT = 4197
 const preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'pipe' })
 await new Promise((r) => setTimeout(r, 1500))
+let failed = false
 try {
   const browser = await chromium.launch()
   const page = await browser.newPage({ viewport: { width: 1100, height: 750 } })
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
-  // NO reduced motion — the real-time playback path
   await page.goto(`http://localhost:${PORT}/`)
   await page.click('button.seat:has-text("1")')
   await page.click('button:has-text("Begin")')
@@ -21,17 +23,25 @@ try {
   for (let i = 0; i < 20; i++) await page.mouse.move(cx + (i % 2 ? 70 : -70), cy + (i % 3) * 10, { steps: 2 })
   await page.mouse.move(cx, cy - 170, { steps: 3 })
   await page.mouse.up()
-  // watch phase over time
-  for (let t = 0; t < 12; t++) {
-    await page.waitForTimeout(1000)
-    const state = await page.evaluate(() => {
-      const s = window.__yachtnight
-      return { rollsUsed: s?.state?.rollsUsed, dice: s?.state?.dice?.join(','), skip: !!document.querySelector('.skip'), picks: document.querySelectorAll('.pick').length, cup: !!document.querySelector('.cup-grip') }
-    })
-    console.log(`t=${t + 1}s`, JSON.stringify(state))
-    if (state.picks > 0) break
+  // real-time playback must finish on its own and re-offer the cup
+  await page.waitForSelector('.game[data-rolling="false"]', { timeout: 15000 })
+  await page.waitForSelector('.cup-grip', { timeout: 5000 })
+  console.log('[repro5] playback finished, cup returned')
+  if (!(await bankAll(page))) {
+    console.error('[repro5] FAIL: could not bank all five')
+    failed = true
+  } else {
+    await page.waitForSelector('.pick', { timeout: 8000 })
+    console.log('[repro5] banked all five → sheet unlocked,', await page.locator('.pick').count(), 'picks')
   }
-  console.log('page errors:', errors)
-  await page.screenshot({ path: process.cwd() + '/e2e/repro5.png' })
+  if (errors.length) {
+    console.error('[repro5] page errors:', errors)
+    failed = true
+  }
   await browser.close()
+} catch (err) {
+  console.error('[repro5] FAIL:', err)
+  failed = true
 } finally { preview.kill() }
+console.log(failed ? '[repro5] FAILED' : '[repro5] OK')
+process.exit(failed ? 1 : 0)

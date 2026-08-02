@@ -203,8 +203,8 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
     // along its fixed direction until both extents fit with margin
     const vfov = (camera.fov * Math.PI) / 180
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect)
-    const needW = PAD.halfW + 2.4
-    const needD = PAD.halfD + 6.4 // includes the keep tray behind the pad
+    const needW = PAD.halfW + 1.9
+    const needD = PAD.halfD + 5.8 // includes the keep tray behind the pad
     const dist = Math.max(needW / Math.tan(hfov / 2), needD / Math.tan(vfov / 2), 13)
     basePos.copy(CAM_LOOK).addScaledVector(CAM_DIR, dist)
   }
