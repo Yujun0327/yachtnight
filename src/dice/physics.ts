@@ -17,6 +17,19 @@ export const DICE_COUNT = 5
  */
 export const PAD = { halfW: 7.2, halfD: 5.0, wallH: 12 }
 
+/**
+ * The keep tray behind the pad: five felt-lined wells that held dice fly
+ * into. Display-only — held dice never simulate.
+ */
+export const TRAY = {
+  z: -(PAD.halfD + 2.6),
+  pitch: 2.0,
+  well: 1.7,
+  baseH: 0.5,
+  /** resting center height of a die sitting in a well */
+  dieY: 0.5 + DIE_SIZE / 2,
+}
+
 export const TUNING = {
   gravity: -55,
   restitution: 0.38,

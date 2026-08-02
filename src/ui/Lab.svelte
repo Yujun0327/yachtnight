@@ -75,7 +75,7 @@
   }
 </script>
 
-<main class="lab" data-faces={faces.join(',')} data-rolling={rolling}>
+<main class="lab" data-faces={faces.join(',')} data-held={held.join(',')} data-rolling={rolling}>
   <div class="table">
     {#await diceStageModule then { default: Stage }}
       <Stage

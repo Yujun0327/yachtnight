@@ -134,6 +134,12 @@
     }
   }
 
+  // tell the director which dice may be picked up (drives glow + KEEP tags)
+  $effect(() => {
+    const mask = faces.map((f, i) => canHold && f > 0 && !held[i])
+    director?.setPickable(mask)
+  })
+
   // held-state changes animate dice into/out of the slots
   let prevHeld = [...held]
   $effect(() => {
@@ -166,7 +172,10 @@
       },
       onRevealed: (f) => onRevealed?.(f),
     })
-    untrack(() => director!.showFaces([...faces], [...held]))
+    untrack(() => {
+      director!.showFaces([...faces], [...held])
+      director!.setPickable(faces.map((f, i) => canHold && f > 0 && !held[i]))
+    })
 
     const ro = new ResizeObserver(() => {
       const r = hostEl.getBoundingClientRect()

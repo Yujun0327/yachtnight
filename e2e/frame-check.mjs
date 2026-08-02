@@ -18,6 +18,20 @@ try {
     for (let i = 0; i < 12; i++) await page.mouse.move(cx + (i % 2 ? 50 : -50), cy, { steps: 2 })
     await page.mouse.move(cx, cy - 140, { steps: 3 }); await page.mouse.up()
     await page.waitForSelector('.lab[data-rolling="false"]', { timeout: 20000 })
+    await page.waitForTimeout(300)
+    if (name === 'desktop') {
+      // grid-click over the pad until two dice are held (they fly to the tray)
+      const canvas = await page.locator('canvas').boundingBox()
+      outer: for (let gy = 0.30; gy <= 0.80; gy += 0.07) {
+        for (let gx = 0.15; gx <= 0.85; gx += 0.06) {
+          await page.mouse.click(canvas.x + canvas.width * gx, canvas.y + canvas.height * gy)
+          const heldStr = await page.getAttribute('.lab', 'data-held')
+          if (heldStr.split(',').filter((v) => v === 'true').length >= 2) break outer
+        }
+      }
+      console.log('held state:', await page.getAttribute('.lab', 'data-held'))
+      await page.waitForTimeout(700) // let the flight land
+    }
     await page.screenshot({ path: `e2e/frame-${name}.png` })
     await page.close()
   }

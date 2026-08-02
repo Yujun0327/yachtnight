@@ -182,3 +182,38 @@ export function brassMaterial(): MeshStandardMaterial {
     metalness: 0.85,
   })
 }
+
+/** A floating pill label ("KEEP") as a sprite texture. */
+export function labelTexture(text: string, size = 256): CanvasTexture {
+  const c = document.createElement('canvas')
+  c.width = size
+  c.height = size / 2
+  const ctx = c.getContext('2d')!
+  const w = size
+  const h = size / 2
+  const r = h * 0.32
+  ctx.beginPath()
+  ctx.roundRect(w * 0.08, h * 0.18, w * 0.84, h * 0.64, r)
+  ctx.fillStyle = 'rgba(8, 13, 10, 0.82)'
+  ctx.fill()
+  ctx.lineWidth = 4
+  ctx.strokeStyle = PALETTE.brass
+  ctx.stroke()
+  ctx.fillStyle = '#f4ecd9'
+  ctx.font = `600 ${h * 0.34}px Jost, Avenir Next, sans-serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.letterSpacing = '6px'
+  ctx.fillText(text, w / 2 + 3, h * 0.51)
+  // little downward pointer
+  ctx.beginPath()
+  ctx.moveTo(w / 2 - h * 0.1, h * 0.82)
+  ctx.lineTo(w / 2 + h * 0.1, h * 0.82)
+  ctx.lineTo(w / 2, h * 0.98)
+  ctx.closePath()
+  ctx.fillStyle = PALETTE.brass
+  ctx.fill()
+  const tex = new CanvasTexture(c)
+  tex.colorSpace = SRGBColorSpace
+  return tex
+}

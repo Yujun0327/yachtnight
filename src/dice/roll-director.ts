@@ -10,7 +10,7 @@
  */
 import * as CANNON from 'cannon-es'
 import { Quaternion, Vector3 } from 'three'
-import type { Mesh } from 'three'
+import type { Mesh, MeshStandardMaterial } from 'three'
 import { mulberry32 } from '../engine/rng'
 import { nearestFlat } from './facemap'
 import { CUP, DIE_SIZE, PAD, makeCup, makeDie, makeMaterials, makeWorld, onImpact } from './physics'
@@ -45,6 +45,9 @@ interface Tween {
   qTo: Quaternion
   t: number
   dur: number
+  /** parabolic hop height — the die FLIES to the tray, it doesn't slide */
+  arc: number
+  onLand?: () => void
 }
 
 export class RollDirector {
@@ -78,6 +81,13 @@ export class RollDirector {
 
   private tweens: Tween[] = []
   private lastShownFaces: number[] = [0, 0, 0, 0, 0]
+  private fieldPose: Record<number, { pos: Vector3; quat: Quaternion }> = {}
+  /** Which dice may be picked up for keeping right now (set by the UI). */
+  private pickable: boolean[] = [false, false, false, false, false]
+
+  setPickable(mask: boolean[]): void {
+    this.pickable = [...mask]
+  }
 
   constructor(stage: Stage, hooks: DirectorHooks = {}) {
     this.stage = stage
@@ -122,11 +132,20 @@ export class RollDirector {
     this.setPhase('idle')
   }
 
-  /** Animate a die into (or out of) its hold slot. */
+  /** Animate a die into (or back out of) its keep-tray well. */
   setHeld(i: number, held: boolean): void {
     this.heldMask[i] = held
-    if (held) this.placeInSlot(i, this.lastShownFaces[i] || 1, true)
-    // un-holding leaves the die where it sits; it will pour into the next cup
+    const die = this.stage.dice[i]
+    if (held) {
+      // remember where it sat on the felt so un-keeping can return it
+      this.fieldPose[i] = { pos: die.position.clone(), quat: die.quaternion.clone() }
+      this.placeInSlot(i, this.lastShownFaces[i] || 1, true)
+    } else {
+      const back = this.fieldPose[i]
+      const to = back?.pos ?? new Vector3((i - 2) * 1.5, DIE_SIZE / 2, 1.5)
+      const qTo = back?.quat ?? nearestFlat(die.quaternion.clone())
+      this.flyTo(die, to, qTo)
+    }
   }
 
   private placeInSlot(i: number, face: number, animate: boolean): void {
@@ -139,6 +158,11 @@ export class RollDirector {
       die.quaternion.copy(qTo)
       return
     }
+    this.flyTo(die, to, qTo)
+  }
+
+  private flyTo(die: Mesh, to: Vector3, qTo: Quaternion): void {
+    this.tweens = this.tweens.filter((tw) => tw.mesh !== die)
     this.tweens.push({
       mesh: die,
       from: die.position.clone(),
@@ -146,7 +170,9 @@ export class RollDirector {
       qFrom: die.quaternion.clone(),
       qTo,
       t: 0,
-      dur: 0.28,
+      dur: 0.42,
+      arc: 1.7,
+      onLand: () => this.hooks.onImpact?.(0.25),
     })
   }
 
@@ -313,6 +339,7 @@ export class RollDirector {
     this.time += dt
     this.rattleCooldown -= dt
     this.stepTweens(dt)
+    this.updateAffordances()
 
     if (this.phase === 'shaking') {
       if (this.autoShake) {
@@ -421,13 +448,40 @@ export class RollDirector {
     }
   }
 
+  /** Pulse pickable dice with a brass glow and float a KEEP tag over them. */
+  private updateAffordances(): void {
+    const idle = this.phase === 'idle'
+    this.stage.dice.forEach((die, i) => {
+      const pickable = idle && this.pickable[i] && !this.heldMask[i] && die.visible
+      const sign = this.stage.keepSigns[i]
+      sign.visible = pickable
+      if (pickable) {
+        sign.position.set(
+          die.position.x,
+          die.position.y + 1.55 + Math.sin(this.time * 2.6 + i) * 0.09,
+          die.position.z,
+        )
+      }
+      const glow = pickable
+        ? 0.22 + 0.12 * Math.sin(this.time * 3.2 + i * 1.3)
+        : idle && this.heldMask[i]
+          ? 0.1 // kept dice keep a steady ember so they read as "banked"
+          : 0
+      for (const m of die.material as MeshStandardMaterial[]) {
+        m.emissive.setRGB(glow * 0.79, glow * 0.63, glow * 0.15)
+      }
+    })
+  }
+
   private stepTweens(dt: number): void {
     for (const tw of this.tweens) {
       tw.t += dt
       const k = Math.min(1, tw.t / tw.dur)
       const e = k * k * (3 - 2 * k)
       tw.mesh.position.copy(tw.from.clone().lerp(tw.to, e))
+      tw.mesh.position.y += Math.sin(Math.PI * e) * tw.arc
       tw.mesh.quaternion.copy(tw.qFrom.clone().slerp(tw.qTo, e))
+      if (tw.t >= tw.dur) tw.onLand?.()
     }
     this.tweens = this.tweens.filter((tw) => tw.t < tw.dur)
   }

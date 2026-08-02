@@ -14,6 +14,8 @@ import {
   PointLight,
   Scene,
   SpotLight,
+  Sprite,
+  SpriteMaterial,
   Vector3,
   WebGLRenderer,
 } from 'three'
@@ -22,10 +24,11 @@ import {
   brassMaterial,
   dieMaterials,
   feltMaterial,
+  labelTexture,
   leatherMaterial,
   walnutMaterial,
 } from './materials'
-import { CUP, DICE_COUNT, DIE_SIZE, PAD } from './physics'
+import { CUP, DICE_COUNT, DIE_SIZE, PAD, TRAY } from './physics'
 
 export interface Stage {
   renderer: WebGLRenderer
@@ -33,6 +36,7 @@ export interface Stage {
   camera: PerspectiveCamera
   dice: Mesh[]
   cup: Group
+  keepSigns: Sprite[]
   /** Extra camera offset for shake/push-in drama; reset each frame by the director. */
   camShake: Vector3
   camPush: { value: number }
@@ -42,7 +46,7 @@ export interface Stage {
 }
 
 const CAM_POS = new Vector3(0, 13.5, 11.5)
-const CAM_LOOK = new Vector3(0, 0, -0.6)
+const CAM_LOOK = new Vector3(0, 0, -1.9)
 const CAM_DIR = CAM_POS.clone().sub(CAM_LOOK).normalize()
 
 export function createStage(canvas: HTMLCanvasElement): Stage {
@@ -55,20 +59,20 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
   camera.position.copy(CAM_POS)
   camera.lookAt(CAM_LOOK)
 
-  /* lights: one warm spot + generous ambient + a candle-warm fill.
-     Bright and inviting — the drama comes from warmth, not gloom. */
-  const spot = new SpotLight('#ffe4b8', 1600)
-  spot.position.set(0, 16, 2)
-  spot.angle = 0.74
+  /* lights: one warm spot + ambient + a candle-warm fill — warm and clear,
+     midway between moody and washed-out. */
+  const spot = new SpotLight('#ffe0b0', 1250)
+  spot.position.set(0, 16, 1)
+  spot.angle = 0.78
   spot.penumbra = 0.6
   spot.decay = 1.5
   spot.castShadow = true
   spot.shadow.mapSize.set(512, 512)
   spot.shadow.bias = -0.002
-  spot.target.position.set(0, 0, 0)
+  spot.target.position.set(0, 0, -1)
   scene.add(spot, spot.target)
-  scene.add(new AmbientLight('#5a6b60', 3.6))
-  const fill = new PointLight('#ffb066', 160, 40, 1.7)
+  scene.add(new AmbientLight('#4d5c52', 2.9))
+  const fill = new PointLight('#ffab60', 120, 40, 1.7)
   fill.position.set(-6, 7, 8)
   scene.add(fill)
 
@@ -96,7 +100,7 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
     bar.receiveShadow = true
     scene.add(bar)
   }
-  // brass corner studs
+  // brass corner studs (studMat is reused by the tray's well frames)
   const studGeo = new CylinderGeometry(0.22, 0.22, rimH + 0.06, 12)
   const studMat = brassMaterial()
   for (const sx of [-1, 1]) {
@@ -105,6 +109,42 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
       stud.position.set(sx * (PAD.halfW + rimT / 2), rimH / 2, sz * (PAD.halfD + rimT / 2))
       scene.add(stud)
     }
+  }
+
+  /* the keep tray: five felt-lined wells on a walnut base behind the pad */
+  const trayW = 5 * TRAY.pitch + 1.1
+  const trayD = TRAY.well + 0.9
+  const trayBase = new Mesh(new RoundedBoxGeometry(trayW, TRAY.baseH, trayD, 3, 0.16), rimMat)
+  trayBase.position.set(0, TRAY.baseH / 2 - 0.02, TRAY.z)
+  trayBase.castShadow = true
+  trayBase.receiveShadow = true
+  scene.add(trayBase)
+  const wellMat = feltMaterial()
+  for (let i = 0; i < 5; i++) {
+    const well = new Mesh(new PlaneGeometry(TRAY.well, TRAY.well), wellMat)
+    well.rotation.x = -Math.PI / 2
+    well.position.set((i - 2) * TRAY.pitch, TRAY.baseH + 0.005, TRAY.z)
+    well.receiveShadow = true
+    scene.add(well)
+    // thin brass frame around each well
+    const frame = new Mesh(
+      new CylinderGeometry(TRAY.well * 0.71, TRAY.well * 0.71, 0.03, 4, 1, true),
+      studMat,
+    )
+    frame.rotation.y = Math.PI / 4
+    frame.position.set((i - 2) * TRAY.pitch, TRAY.baseH + 0.02, TRAY.z)
+    scene.add(frame)
+  }
+
+  /* floating KEEP tags, one per die (director drives visibility/position) */
+  const keepSigns: Sprite[] = []
+  const keepTex = labelTexture('KEEP')
+  for (let i = 0; i < DICE_COUNT; i++) {
+    const sprite = new Sprite(new SpriteMaterial({ map: keepTex, transparent: true, depthWrite: false }))
+    sprite.scale.set(1.9, 0.95, 1)
+    sprite.visible = false
+    scene.add(sprite)
+    keepSigns.push(sprite)
   }
 
   /* dice */
@@ -164,7 +204,7 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
     const vfov = (camera.fov * Math.PI) / 180
     const hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect)
     const needW = PAD.halfW + 2.4
-    const needD = PAD.halfD + 4.6
+    const needD = PAD.halfD + 6.4 // includes the keep tray behind the pad
     const dist = Math.max(needW / Math.tan(hfov / 2), needD / Math.tan(vfov / 2), 13)
     basePos.copy(CAM_LOOK).addScaledVector(CAM_DIR, dist)
   }
@@ -179,5 +219,5 @@ export function createStage(canvas: HTMLCanvasElement): Stage {
     })
   }
 
-  return { renderer, scene, camera, dice, cup, camShake, camPush, render, setSize, dispose }
+  return { renderer, scene, camera, dice, cup, keepSigns, camShake, camPush, render, setSize, dispose }
 }
