@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { MONEY_RULES } from '@yujun/game-net/wallet'
   import type { OnlineSession } from '../app/session.svelte'
   import { savePlayerName } from '../app/persist'
+
+  const STAKES = MONEY_RULES.yachtnight?.stakes ?? []
 
   interface Props {
     session: OnlineSession
@@ -77,6 +80,11 @@
               {#if seat.playerKey === session.hostKey}
                 <span class="label">host</span>
               {/if}
+              {#if session.balances[seat.playerKey] !== undefined}
+                <span class="label cash" class:short={session.hostStake > 0 && session.balances[seat.playerKey] < session.hostStake}>
+                  {session.balances[seat.playerKey].toLocaleString()}
+                </span>
+              {/if}
               <span class="ready" class:yes={seat.ready}>{seat.ready ? 'Ready' : 'Not ready'}</span>
             {:else}
               <span class="dot"></span>
@@ -85,6 +93,21 @@
           </li>
         {/each}
       </ul>
+
+      {#if session.isHost && STAKES.length}
+        <div class="rulesets" role="group" aria-label="stake">
+          <button class="btn" class:btn--gold={session.hostStake === 0} onclick={() => (session.hostStake = 0)}>
+            Just for fun
+          </button>
+          {#each STAKES as stake (stake)}
+            <button class="btn" class:btn--gold={session.hostStake === stake} onclick={() => (session.hostStake = stake)}>
+              {stake.toLocaleString()} each
+            </button>
+          {/each}
+        </div>
+      {:else if session.hostStake > 0}
+        <p class="hint">Stake: {session.hostStake.toLocaleString()} each — winner takes the pot.</p>
+      {/if}
 
       {#if session.isHost}
         <div class="rulesets" role="group" aria-label="ruleset">
@@ -110,6 +133,7 @@
           <button
             class="btn"
             class:btn--gold={!mySeatEntry.ready}
+            disabled={!mySeatEntry.ready && !session.canAfford}
             onclick={() => session.setReady(!mySeatEntry.ready)}
           >
             {mySeatEntry.ready ? 'Not ready after all' : "I'm ready"}
@@ -137,6 +161,8 @@
             browser (Chrome or Safari, not a messenger's built-in one).
             <button class="btn btn--quiet" onclick={() => session.rescan()}>Retry connection</button>
           {/if}
+        {:else if !session.canAfford}
+          You need {session.hostStake.toLocaleString()} cash to sit at this stake — collect today's cash on the portal or ask the host to lower it.
         {:else if session.isHost}
           Start needs at least two seated players, everyone ready.
         {:else}
@@ -255,6 +281,9 @@
     letter-spacing: 0.1em;
     color: color-mix(in srgb, var(--cream) 50%, transparent);
   }
+
+  .cash { font-variant-numeric: tabular-nums; }
+  .cash.short { color: #d9534f; }
 
   .ready.yes {
     color: var(--brass-hi);

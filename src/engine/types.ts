@@ -27,6 +27,8 @@ export interface GameConfig {
   names: string[]
   rulesVersion: string
   ruleset: RulesetId
+  /** Cash each seat puts in (online bet games); 0 or absent = no stake. */
+  stake?: number
 }
 
 export interface Scorecard {

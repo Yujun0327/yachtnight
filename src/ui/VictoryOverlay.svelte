@@ -1,4 +1,6 @@
 <script lang="ts">
+  import type { LockState, Payout } from '@yujun/game-net/wallet'
+  import PayoutLine from './PayoutLine.svelte'
   import { fade, scale } from 'svelte/transition'
   import type { GameResult } from '../engine'
   import { dur, settle } from './motion'
@@ -10,11 +12,13 @@
     won: boolean
     solo: boolean
     newBest: boolean
+    payout?: Payout | null
+    lock?: LockState | null
     onRematch: () => void
     onExit: () => void
   }
 
-  let { result, names, won, solo, newBest, onRematch, onExit }: Props = $props()
+  let { result, names, won, solo, newBest, payout = null, lock = null, onRematch, onExit }: Props = $props()
 
   const winnerNames = $derived(result.winners.map((s) => names[s]).join(' & '))
 </script>
@@ -42,6 +46,7 @@
     {/if}
 
     <div class="actions">
+      <PayoutLine {payout} {lock} />
       <button class="btn btn--gold" onclick={onRematch}>Another round</button>
       <button class="btn btn--quiet" onclick={onExit}>Leave the table</button>
     </div>

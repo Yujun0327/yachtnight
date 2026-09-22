@@ -200,6 +200,8 @@
       names={session.names}
       won={session.mySeat === null || gs.result.winners.includes(session.mySeat)}
       solo={soloGame}
+      payout={online?.payout ?? null}
+      lock={online?.lockState ?? null}
       {newBest}
       onRematch={() => {
         newBest = false

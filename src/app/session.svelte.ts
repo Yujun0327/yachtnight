@@ -16,6 +16,7 @@ import {
   type GameAdapter,
   type Transport,
 } from '@yujun/game-net'
+import { WalletSession, defaultLedger, loadIdentity, type Identity, type Ledger, type LockState, type Payout } from '@yujun/game-net/wallet'
 import { APP } from './persist'
 
 export type SfxEvent = 'score' | 'zero' | 'bigscore' | 'win' | 'lose'
@@ -109,6 +110,7 @@ export class HotseatSession extends BaseSession {
       names: names.map((n, i) => n.trim() || `Player ${i + 1}`),
       rulesVersion: RULES_VERSION,
       ruleset: rules,
+      stake: 0,
     }
     super(cfg, createGame(cfg))
   }
@@ -158,6 +160,7 @@ function placeholderConfig(): GameConfig {
     names: ['—', '—'],
     rulesVersion: RULES_VERSION,
     ruleset: 'yacht',
+    stake: 0,
   }
 }
 
@@ -172,7 +175,7 @@ type Core = BeaconSession<GameConfig, GameState, Move>
 function makeAdapter(host: () => OnlineSession | null): GameAdapter<GameConfig, GameState, Move> {
   return {
     app: APP,
-    protocol: 2,
+    protocol: 3,
     rulesVersion: RULES_VERSION,
     minSeats: 2,
     maxSeats: 4,
@@ -187,6 +190,7 @@ function makeAdapter(host: () => OnlineSession | null): GameAdapter<GameConfig, 
         names: players.map((p, i) => p.name.trim() || `Player ${i + 1}`),
         rulesVersion: RULES_VERSION,
       ruleset: prev ? prev.ruleset : (host()?.hostRuleset ?? 'yacht'),
+      stake: prev ? (prev.stake ?? 0) : (host()?.hostStake ?? 0),
       }
     },
     create: (cfg) => ({ state: createGame(cfg) }),
@@ -194,10 +198,14 @@ function makeAdapter(host: () => OnlineSession | null): GameAdapter<GameConfig, 
     hash: publicHash,
     actor: (s) => s.seatToAct,
     isOver: (s) => s.result !== null,
+    winners: (s) => s.result?.winners ?? [],
+    stake: (cfg) => cfg.stake ?? 0,
   }
 }
 
 export interface OnlineTestHooks {
+  ledger?: Ledger
+  identity?: Identity
   transport?: Transport<Beacon<GameConfig, Move>>
   now?: () => number
   timers?: boolean
@@ -207,10 +215,57 @@ export class OnlineSession extends BaseSession {
   readonly mode = 'online'
   readonly room: string
   readonly myKey: string
-  /** Host's ruleset pick, applied when the game starts. */
-  hostRuleset = $state<RulesetId>('yacht')
+  /** Host's lobby pick (ruleset + stake), mirrored to guests through the beacon. */
+  private pick = $state<{ ruleset: RulesetId; stake: number }>({ ruleset: 'yacht', stake: 0 })
+  /** Cash balance per seated player key, for the stake gate in the lobby. */
+  balances = $state<Record<string, number>>({})
+  private balanceKeys = ''
+
+  get hostRuleset(): RulesetId {
+    return this.pick.ruleset
+  }
+
+  set hostRuleset(v: RulesetId) {
+    this.pick = { ...this.pick, ruleset: v }
+    this.announcePick()
+  }
+
+  get hostStake(): number {
+    return this.pick.stake
+  }
+
+  set hostStake(v: number) {
+    this.pick = { ...this.pick, stake: v }
+    this.announcePick()
+  }
+
+  private announcePick(): void {
+    if (this.core.isHost && !this.core.started) this.core.setExtra({ pick: $state.snapshot(this.pick) })
+  }
+
+  /** Can this player afford the table's stake? */
+  get canAfford(): boolean {
+    if (!this.pick.stake || !this.wallet) return true
+    const mine = this.balances[this.myKey]
+    return mine === undefined ? true : mine >= this.pick.stake
+  }
+
+  private refreshBalances(): void {
+    const ledger = this.ledger
+    if (!ledger) return
+    const keys = this.core.players.map((p) => p.key)
+    const sig = keys.join(',')
+    if (sig === this.balanceKeys) return
+    this.balanceKeys = sig
+    for (const key of keys) {
+      void ledger.readPlayer(key).then((p) => {
+        if (p) this.balances = { ...this.balances, [key]: p.balance }
+      })
+    }
+  }
 
   private readonly core: Core
+  private wallet: WalletSession<GameConfig, GameState, Move, undefined> | null = null
   /**
    * Reactive revision, bumped on every core change. Every getter reads it
    * first, so templates track it even when the rest short-circuits — if
@@ -243,6 +298,12 @@ export class OnlineSession extends BaseSession {
     this.seenLog = core.logLength
     this.gameId = core.snapshot?.gameId ?? ''
     core.subscribe(() => this.sync())
+    // the platform wallet: locks stakes, signs and posts settlements, reports payouts
+    const ledger = test.ledger ?? (test.transport ? null : defaultLedger())
+    if (ledger) {
+      this.wallet = new WalletSession(core, APP, test.identity ?? loadIdentity(), ledger, test.now)
+      this.wallet.subscribe(() => this.rev++)
+    }
   }
 
   /** The core, read through the reactive revision. */
@@ -274,6 +335,14 @@ export class OnlineSession extends BaseSession {
     }
     this.seenLog = log.length
     this.prev = core.state
+    if (!core.started) {
+      if (!core.isHost) {
+        const host = core.livePeers.find((p) => p.key === core.hostKey)
+        const pick = (host?.extra as { pick?: { ruleset: RulesetId; stake: number } } | undefined)?.pick
+        if (pick) this.pick = pick
+      } else if (core.isHost && !core.extra) this.announcePick()
+      this.refreshBalances()
+    }
     this.rev++
   }
 
@@ -347,6 +416,7 @@ export class OnlineSession extends BaseSession {
   }
 
   setReady(ready: boolean): void {
+    if (ready && !this.canAfford) return
     this.core.setReady(ready)
   }
 
@@ -381,11 +451,27 @@ export class OnlineSession extends BaseSession {
     return this.core
   }
 
+  /** Wallet outcome of the current game (null when this build has no wallet). */
+  get payout(): Payout | null {
+    void this.rev
+    return this.wallet?.payout ?? null
+  }
+
+  get lockState(): LockState | null {
+    void this.rev
+    return this.wallet?.lock ?? null
+  }
+
+  get ledger(): Ledger | null {
+    return this.wallet ? (this.wallet as unknown as { ledger: Ledger }).ledger : null
+  }
+
   leave(): void {
     this.core.leave()
   }
 
   destroy(): void {
+    this.wallet?.destroy()
     this.core.destroy()
   }
 }

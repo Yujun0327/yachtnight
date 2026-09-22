@@ -1,4 +1,5 @@
 <script lang="ts">
+  import WalletBadge from './WalletBadge.svelte'
   import type { RulesetId } from '../engine'
   import { bestScore } from '../app/persist'
   import RulesLeaflet from './RulesLeaflet.svelte'
@@ -29,6 +30,7 @@
     <p class="label">Shake · Throw · Score</p>
     <button class="btn btn--quiet" onclick={() => (rulesOpen = true)}>How to play</button>
   </header>
+  <WalletBadge />
 
   <div class="rulesets" role="group" aria-label="ruleset">
     <button

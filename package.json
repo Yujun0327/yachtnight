@@ -9,7 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json"
+    "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
+    "deploy:gh": "bash scripts/deploy-ghpages.sh"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
@@ -29,7 +30,7 @@
     "@fontsource/bodoni-moda": "^5.2.8",
     "@fontsource/jost": "^5.2.8",
     "@fontsource/limelight": "^5.2.8",
-    "@yujun/game-net": "github:Yujun0327/game-net#v0.2.1",
+    "@yujun/game-net": "github:Yujun0327/game-net#v0.3.0",
     "cannon-es": "^0.20.0",
     "three": "^0.182.0"
   }
