@@ -2,7 +2,7 @@
   import type { RulesetId } from './engine'
   import { loadPlayerName, playerKey } from './app/persist'
   import { HotseatSession, OnlineSession } from './app/session.svelte'
-  import { makeRoomCode } from './transport/trystero'
+  import { makeRoomCode } from '@yujun/game-net'
   import GameScreen from './ui/GameScreen.svelte'
   import Home from './ui/Home.svelte'
   import Lab from './ui/Lab.svelte'

@@ -29,8 +29,8 @@
     "@fontsource/bodoni-moda": "^5.2.8",
     "@fontsource/jost": "^5.2.8",
     "@fontsource/limelight": "^5.2.8",
+    "@yujun/game-net": "github:Yujun0327/game-net#v0.1.0",
     "cannon-es": "^0.20.0",
-    "three": "^0.182.0",
-    "trystero": "^0.25.2"
+    "three": "^0.182.0"
   }
 }

@@ -126,7 +126,7 @@
       <p class="hint">
         {#if session.status === 'connecting' && filled.length <= 1}
           <span class="dot" class:on={relays > 0}></span>
-          {relays > 0 ? 'Connected to the signaling network.' : 'Reaching the signaling network…'}
+          {relays > 0 ? 'Connected to the game network.' : 'Reaching the game network…'}
           {#if !session.isHost}
             Waiting for the host.
           {:else}
@@ -134,8 +134,8 @@
           {/if}
           {#if waitedLong && filled.length <= 1}
             Still quiet — check the room code, and make sure everyone opened the link in a real
-            browser (Chrome or Safari, not a messenger's built-in one). Switching between Wi-Fi
-            and mobile data sometimes unblocks a stubborn connection.
+            browser (Chrome or Safari, not a messenger's built-in one).
+            <button class="btn btn--quiet" onclick={() => session.rescan()}>Retry connection</button>
           {/if}
         {:else if session.isHost}
           Start needs at least two seated players, everyone ready.
