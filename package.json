@@ -30,7 +30,7 @@
     "@fontsource/bodoni-moda": "^5.2.8",
     "@fontsource/jost": "^5.2.8",
     "@fontsource/limelight": "^5.2.8",
-    "@yujun/game-net": "github:Yujun0327/game-net#v0.3.0",
+    "@yujun/game-net": "github:Yujun0327/game-net#v0.3.1",
     "cannon-es": "^0.20.0",
     "three": "^0.182.0"
   }
